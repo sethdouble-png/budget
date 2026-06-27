@@ -7,53 +7,266 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="container">
-    <h1>Seth & Paula Finances</h1>
-
-    <section class="summary">
-      <div>
-        Currency: <select id="currencySelect">
-          <option value="USD">USD ($)</option>
-          <option value="AED">AED (د.إ)</option>
-          <option value="UGX">UGX (USh)</option>
-        </select>
-      </div>
-      <div id="income">Income: $0.00</div>
-      <div id="expense">Expense: $0.00</div>
-      <div id="savings">Savings: $0.00</div>
-      <div>
-        Budget: <span id="currencySymbol">$</span><input id="budgetInput" type="number" step="0.01" min="0"> <button id="saveBudget">Save</button>
-      </div>
-    </section>
-
-    <section class="add">
-      <h2>Add transaction</h2>
-      <form id="txForm">
-        <input id="date" type="date" required>
-        <input id="amount" type="number" step="0.01" placeholder="amount" required>
-        <select id="type">
-          <option value="expense">Expense</option>
-          <option value="income">Income</option>
-        </select>
-        <input id="category" placeholder="category">
-        <input id="note" placeholder="note">
-        <button type="submit">Add</button>
+  <!-- Auth Pages -->
+  <div id="authPages" class="container">
+    <div id="loginPage" class="auth-page">
+      <h1>Seth & Paula Finances</h1>
+      <p>Login to your account</p>
+      <form id="loginForm">
+        <input type="email" id="loginEmail" placeholder="Email" required>
+        <input type="password" id="loginPassword" placeholder="Password" required>
+        <button type="submit">Login</button>
       </form>
-    </section>
+      <p>Don't have an account? <a href="#" onclick="switchToSignup()">Sign up</a></p>
+      <div id="loginError" class="error"></div>
+    </div>
 
-    <section class="list">
-      <h2>Transactions</h2>
-      <div class="export-buttons">
-        <button id="exportAll">Export All</button>
-        <button id="exportIncome">Export Income</button>
-        <button id="exportExpenses">Export Expenses</button>
-        <button id="exportSummary">Export Summary</button>
+    <div id="signupPage" class="auth-page" style="display:none">
+      <h1>Seth & Paula Finances</h1>
+      <p>Create a new account</p>
+      <form id="signupForm">
+        <input type="email" id="signupEmail" placeholder="Email" required>
+        <input type="password" id="signupPassword" placeholder="Password (min 6 chars)" minlength="6" required>
+        <input type="password" id="signupConfirm" placeholder="Confirm Password" required>
+        <button type="submit">Sign Up</button>
+      </form>
+      <p>Already have an account? <a href="#" onclick="switchToLogin()">Login</a></p>
+      <div id="signupError" class="error"></div>
+    </div>
+  </div>
+
+  <!-- Main App -->
+  <div id="appContainer" class="container" style="display:none">
+    <div class="app-header">
+      <h1>Seth & Paula Finances</h1>
+      <div class="header-controls">
+        <select id="currencySelect">
+          <option value="USD">USD ($)</option>
+          <option value="AED">AED</option>
+          <option value="UGX">UGX</option>
+        </select>
       </div>
-      <table id="txTable">
-        <thead><tr><th>Date</th><th>Amount</th><th>Type</th><th>Category</th><th>Note</th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </section>
+    </div>
+
+    <!-- Tabs Navigation -->
+    <div class="tabs">
+      <button class="tab-btn active" onclick="showTab(event, 'dashboard')">Dashboard</button>
+      <button class="tab-btn" onclick="showTab(event, 'transactions')">Transactions</button>
+      <button class="tab-btn" onclick="showTab(event, 'analytics')">Analytics</button>
+      <button class="tab-btn" onclick="showTab(event, 'recurring')">Recurring</button>
+      <button class="tab-btn" onclick="showTab(event, 'settings')">Settings</button>
+    </div>
+
+    <!-- Dashboard Tab -->
+    <div id="dashboard" class="tab-content active">
+      <section class="summary">
+        <div class="summary-item">
+          <label>Income</label>
+          <div id="income" class="amount">$0.00</div>
+        </div>
+        <div class="summary-item">
+          <label>Expenses</label>
+          <div id="expense" class="amount">$0.00</div>
+        </div>
+        <div class="summary-item">
+          <label>Savings</label>
+          <div id="savings" class="amount">$0.00</div>
+        </div>
+      </section>
+
+      <section class="budget-section">
+        <h2>Budget Progress</h2>
+        <div class="budget-display">
+          <div class="budget-info">
+            <span id="budgetSpent">$0.00</span> / <span id="budgetTotal">$0.00</span>
+          </div>
+          <div class="budget-bar">
+            <div id="budgetFill" class="budget-fill"></div>
+          </div>
+          <div class="budget-percentage" id="budgetPercent">0%</div>
+        </div>
+      </section>
+
+      <section class="quick-add">
+        <h2>Quick Add Transaction</h2>
+        <form id="txForm">
+          <input id="date" type="date" required>
+          <input id="amount" type="number" step="0.01" placeholder="amount" required>
+          <select id="type">
+            <option value="expense">Expense</option>
+            <option value="income">Income</option>
+          </select>
+          <input id="category" placeholder="category" required>
+          <input id="note" placeholder="note">
+          <button type="submit">Add</button>
+        </form>
+      </section>
+    </div>
+
+    <!-- Transactions Tab -->
+    <div id="transactions" class="tab-content">
+      <div class="tx-controls">
+        <input id="searchTx" type="text" placeholder="Search transactions...">
+        <input id="filterStartDate" type="date">
+        <input id="filterEndDate" type="date">
+        <select id="filterType">
+          <option value="">All Types</option>
+          <option value="income">Income</option>
+          <option value="expense">Expense</option>
+        </select>
+        <button onclick="applyFilters()">Filter</button>
+        <button onclick="clearFilters()">Clear</button>
+      </div>
+
+      <div class="export-buttons">
+        <button onclick="exportTransactions()">Export All</button>
+      </div>
+
+      <div class="tx-list">
+        <table id="txTable">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Amount</th>
+              <th>Type</th>
+              <th>Category</th>
+              <th>Note</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <!-- Edit Modal -->
+      <div id="editModal" class="modal" style="display:none">
+        <div class="modal-content">
+          <span class="close" onclick="closeEditModal()">&times;</span>
+          <h2>Edit Transaction</h2>
+          <form id="editForm">
+            <input id="editId" type="hidden">
+            <input id="editDate" type="date" required>
+            <input id="editAmount" type="number" step="0.01" required>
+            <select id="editType">
+              <option value="expense">Expense</option>
+              <option value="income">Income</option>
+            </select>
+            <input id="editCategory" placeholder="category" required>
+            <input id="editNote" placeholder="note">
+            <button type="submit">Save</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Analytics Tab -->
+    <div id="analytics" class="tab-content">
+      <div class="analytics-controls">
+        <input id="analyticsStartDate" type="date">
+        <input id="analyticsEndDate" type="date">
+        <button onclick="loadAnalytics()">Load Analytics</button>
+      </div>
+
+      <div class="analytics-container">
+        <section class="analytics-section">
+          <h2>Spending by Category</h2>
+          <div id="categoriesChart" class="chart">
+            <table id="categoriesTable" class="analytics-table">
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th>Amount</th>
+                  <th>Percentage</th>
+                  <th>Visual</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="analytics-section">
+          <h2>Monthly Report</h2>
+          <div id="monthlyChart" class="chart">
+            <table id="monthlyTable" class="analytics-table">
+              <thead>
+                <tr>
+                  <th>Month</th>
+                  <th>Income</th>
+                  <th>Expenses</th>
+                  <th>Savings</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <!-- Recurring Tab -->
+    <div id="recurring" class="tab-content">
+      <section class="add-recurring">
+        <h2>Add Recurring Transaction</h2>
+        <form id="recurringForm">
+          <input id="recurAmount" type="number" step="0.01" placeholder="Amount" required>
+          <select id="recurType">
+            <option value="expense">Expense</option>
+            <option value="income">Income</option>
+          </select>
+          <input id="recurCategory" placeholder="Category" required>
+          <input id="recurNote" placeholder="Note">
+          <select id="recurFrequency">
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+            <option value="yearly">Yearly</option>
+          </select>
+          <input id="recurStartDate" type="date" required>
+          <input id="recurEndDate" type="date" placeholder="End Date (optional)">
+          <button type="submit">Add Recurring</button>
+        </form>
+      </section>
+
+      <section class="recurring-list">
+        <h2>Recurring Transactions</h2>
+        <div id="recurringTable">
+          <table>
+            <thead>
+              <tr>
+                <th>Amount</th>
+                <th>Type</th>
+                <th>Category</th>
+                <th>Frequency</th>
+                <th>Start Date</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- Settings Tab -->
+    <div id="settings" class="tab-content">
+      <section class="settings-section">
+        <h2>Budget Settings</h2>
+        <div class="setting-group">
+          <label>Monthly Budget (<span id="budgetCurrency">$</span>)</label>
+          <input id="budgetInput" type="number" step="0.01" min="0">
+          <button onclick="saveBudget()">Save Budget</button>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h2>Account</h2>
+        <div class="setting-group">
+          <p id="userEmail"></p>
+        </div>
+      </section>
+    </div>
   </div>
 
   <script src="app.js"></script>

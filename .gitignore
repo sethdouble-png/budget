@@ -1,2 +1,6 @@
 node_modules/
 finance.db
+.env
+.env.*
+.DS_Store
+npm-debug.log*
