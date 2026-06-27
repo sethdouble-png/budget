@@ -13,13 +13,29 @@ function downloadCSV(url, filename) {
   document.body.removeChild(link);
 }
 
+const currencySymbols = {
+  'USD': '$',
+  'AED': 'د.إ',
+  'UGX': 'USh'
+};
+
+let currentCurrency = 'USD';
+
+function getCurrencySymbol(currency) {
+  return currencySymbols[currency] || '$';
+}
+
 async function refreshSummary() {
   try {
     const s = await fetchJSON('/api/summary');
-    document.getElementById('income').textContent = 'Income: $' + s.income.toFixed(2);
-    document.getElementById('expense').textContent = 'Expense: $' + s.expense.toFixed(2);
-    document.getElementById('savings').textContent = 'Savings: $' + s.savings.toFixed(2);
+    currentCurrency = s.currency || 'USD';
+    const symbol = getCurrencySymbol(currentCurrency);
+    document.getElementById('income').textContent = 'Income: ' + symbol + s.income.toFixed(2);
+    document.getElementById('expense').textContent = 'Expense: ' + symbol + s.expense.toFixed(2);
+    document.getElementById('savings').textContent = 'Savings: ' + symbol + s.savings.toFixed(2);
     document.getElementById('budgetInput').value = s.monthly_budget || '';
+    document.getElementById('currencySymbol').textContent = symbol;
+    document.getElementById('currencySelect').value = currentCurrency;
   } catch (e) {
     console.error(e);
   }
@@ -30,9 +46,10 @@ async function refreshTransactions() {
     const tx = await fetchJSON('/api/transactions');
     const tbody = document.querySelector('#txTable tbody');
     tbody.innerHTML = '';
+    const symbol = getCurrencySymbol(currentCurrency);
     tx.forEach(t => {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${t.date}</td><td>${t.amount.toFixed(2)}</td><td>${t.type}</td><td>${t.category}</td><td>${t.note}</td>`;
+      tr.innerHTML = `<td>${t.date}</td><td>${symbol}${t.amount.toFixed(2)}</td><td>${t.type}</td><td>${t.category}</td><td>${t.note}</td>`;
       tbody.appendChild(tr);
     });
   } catch (e) { console.error(e); }
@@ -59,6 +76,15 @@ document.getElementById('saveBudget').addEventListener('click', async () => {
     await fetchJSON('/api/budget', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ monthly_budget: val }) });
     await refreshSummary();
   } catch (e) { alert('Error saving budget'); console.error(e); }
+});
+
+document.getElementById('currencySelect').addEventListener('change', async (ev) => {
+  const newCurrency = ev.target.value;
+  try {
+    await fetchJSON('/api/currency', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ currency: newCurrency }) });
+    await refreshSummary();
+    await refreshTransactions();
+  } catch (e) { alert('Error changing currency'); console.error(e); }
 });
 
 // Export buttons

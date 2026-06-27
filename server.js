@@ -60,13 +60,15 @@ app.get('/api/summary', (req, res) => {
       if (err1) return res.status(500).json({ error: err1.message });
       db.get("SELECT IFNULL(SUM(amount),0) AS expense FROM transactions WHERE type='expense'", (err2, expenseRow) => {
         if (err2) return res.status(500).json({ error: err2.message });
-        db.get("SELECT value FROM settings WHERE key='monthly_budget'", (err3, budgetRow) => {
+        db.all("SELECT key, value FROM settings WHERE key IN ('monthly_budget', 'currency')", (err3, settingsRows) => {
           if (err3) return res.status(500).json({ error: err3.message });
           const income = incomeRow ? incomeRow.income : 0;
           const expense = expenseRow ? expenseRow.expense : 0;
           const savings = income - expense;
-          const monthly_budget = budgetRow ? Number(budgetRow.value) : 0;
-          res.json({ income, expense, savings, monthly_budget });
+          const settings = settingsRows || [];
+          const monthly_budget = (settings.find(s => s.key === 'monthly_budget')?.value) ? Number(settings.find(s => s.key === 'monthly_budget').value) : 0;
+          const currency = settings.find(s => s.key === 'currency')?.value || 'USD';
+          res.json({ income, expense, savings, monthly_budget, currency });
         });
       });
     });
@@ -81,6 +83,16 @@ app.post('/api/budget', (req, res) => {
   stmt.run('monthly_budget', val, function(err) {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ monthly_budget: Number(val) });
+  });
+});
+
+app.post('/api/currency', (req, res) => {
+  const { currency } = req.body;
+  if (!currency) return res.status(400).json({ error: 'currency required' });
+  const stmt = db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value');
+  stmt.run('currency', currency, function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ currency });
   });
 });
 
