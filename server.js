@@ -84,6 +84,84 @@ app.post('/api/budget', (req, res) => {
   });
 });
 
+// Export endpoints
+function convertToCSV(rows, headers) {
+  if (!rows || rows.length === 0) return headers.join(',') + '\n';
+  const csv = [headers.join(',')];
+  rows.forEach(row => {
+    const values = headers.map(h => {
+      const val = row[h];
+      if (val === null || val === undefined) return '';
+      return typeof val === 'string' && val.includes(',') ? `"${val}"` : val;
+    });
+    csv.push(values.join(','));
+  });
+  return csv.join('\n');
+}
+
+app.get('/api/export/transactions', (req, res) => {
+  db.all('SELECT * FROM transactions ORDER BY date DESC, id DESC', (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    const headers = ['Date', 'Amount', 'Type', 'Category', 'Note'];
+    const csvData = convertToCSV(rows, ['date', 'amount', 'type', 'category', 'note']);
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="transactions.csv"');
+    res.send(csvData);
+  });
+});
+
+app.get('/api/export/income', (req, res) => {
+  db.all("SELECT * FROM transactions WHERE type='income' ORDER BY date DESC, id DESC", (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    const headers = ['Date', 'Amount', 'Category', 'Note'];
+    const csvData = convertToCSV(rows, ['date', 'amount', 'category', 'note']);
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="income.csv"');
+    res.send(csvData);
+  });
+});
+
+app.get('/api/export/expenses', (req, res) => {
+  db.all("SELECT * FROM transactions WHERE type='expense' ORDER BY date DESC, id DESC", (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    const headers = ['Date', 'Amount', 'Category', 'Note'];
+    const csvData = convertToCSV(rows, ['date', 'amount', 'category', 'note']);
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="expenses.csv"');
+    res.send(csvData);
+  });
+});
+
+app.get('/api/export/summary', (req, res) => {
+  db.serialize(() => {
+    db.get("SELECT IFNULL(SUM(amount),0) AS income FROM transactions WHERE type='income'", (err1, incomeRow) => {
+      if (err1) return res.status(500).json({ error: err1.message });
+      db.get("SELECT IFNULL(SUM(amount),0) AS expense FROM transactions WHERE type='expense'", (err2, expenseRow) => {
+        if (err2) return res.status(500).json({ error: err2.message });
+        db.get("SELECT value FROM settings WHERE key='monthly_budget'", (err3, budgetRow) => {
+          if (err3) return res.status(500).json({ error: err3.message });
+          const income = incomeRow ? incomeRow.income : 0;
+          const expense = expenseRow ? expenseRow.expense : 0;
+          const savings = income - expense;
+          const monthly_budget = budgetRow ? Number(budgetRow.value) : 0;
+          
+          const summaryData = [
+            ['Category', 'Amount'],
+            ['Income', income.toFixed(2)],
+            ['Expenses', expense.toFixed(2)],
+            ['Savings', savings.toFixed(2)],
+            ['Monthly Budget', monthly_budget.toFixed(2)]
+          ].map(row => row.join(',')).join('\n');
+          
+          res.setHeader('Content-Type', 'text/csv');
+          res.setHeader('Content-Disposition', 'attachment; filename="summary.csv"');
+          res.send(summaryData);
+        });
+      });
+    });
+  });
+});
+
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });

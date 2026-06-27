@@ -5,3 +5,6 @@ h1{margin-top:0}
 .add form input, .add form select{margin-right:6px;padding:6px}
 #txTable{width:100%;border-collapse:collapse;margin-top:12px}
 #txTable th,#txTable td{border:1px solid #eee;padding:8px;text-align:left}
+.export-buttons{margin:12px 0 12px 0;display:flex;gap:8px;flex-wrap:wrap}
+.export-buttons button{padding:8px 12px;background:#4CAF50;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px}
+.export-buttons button:hover{background:#45a049}

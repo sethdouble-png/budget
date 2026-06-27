@@ -4,6 +4,15 @@ async function fetchJSON(url, opts) {
   return r.json();
 }
 
+function downloadCSV(url, filename) {
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
 async function refreshSummary() {
   try {
     const s = await fetchJSON('/api/summary');
@@ -50,6 +59,23 @@ document.getElementById('saveBudget').addEventListener('click', async () => {
     await fetchJSON('/api/budget', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ monthly_budget: val }) });
     await refreshSummary();
   } catch (e) { alert('Error saving budget'); console.error(e); }
+});
+
+// Export buttons
+document.getElementById('exportAll').addEventListener('click', () => {
+  downloadCSV('/api/export/transactions', 'transactions.csv');
+});
+
+document.getElementById('exportIncome').addEventListener('click', () => {
+  downloadCSV('/api/export/income', 'income.csv');
+});
+
+document.getElementById('exportExpenses').addEventListener('click', () => {
+  downloadCSV('/api/export/expenses', 'expenses.csv');
+});
+
+document.getElementById('exportSummary').addEventListener('click', () => {
+  downloadCSV('/api/export/summary', 'summary.csv');
 });
 
 async function init() {
