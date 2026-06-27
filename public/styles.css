@@ -1,0 +1,7 @@
+body{font-family:Arial,Helvetica,sans-serif;background:#f5f7fb;color:#222;padding:20px}
+.container{max-width:900px;margin:0 auto;background:#fff;padding:20px;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
+h1{margin-top:0}
+.summary>div{margin:6px 0}
+.add form input, .add form select{margin-right:6px;padding:6px}
+#txTable{width:100%;border-collapse:collapse;margin-top:12px}
+#txTable th,#txTable td{border:1px solid #eee;padding:8px;text-align:left}
