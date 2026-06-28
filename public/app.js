@@ -139,6 +139,15 @@ async function fetchJSON(url, opts = {}) {
   return data;
 }
 
+async function parseResponse(res) {
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { error: text || res.statusText };
+  }
+}
+
 // ===== INITIALIZATION =====
 async function init() {
   if (authToken) {
@@ -198,7 +207,7 @@ async function handleLogin(e) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
     });
-    const result = await res.json();
+    const result = await parseResponse(res);
 
     if (!res.ok) {
       document.getElementById('loginError').textContent = result.error || 'Login failed';
@@ -262,7 +271,7 @@ async function handleSignup(e) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
     });
-    const result = await res.json();
+    const result = await parseResponse(res);
 
     if (!res.ok) {
       document.getElementById('signupError').textContent = result.error || 'Signup failed';

@@ -170,6 +170,15 @@ if (isProduction) {
 }
 app.use(express.static(path.join(__dirname, 'public')));
 
+app.use((req, res, next) => {
+  try {
+    initializeSupabase();
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Middleware to get user from auth header
 async function getUserFromToken(req, res, next) {
   const token = req.headers.authorization?.split('Bearer ')[1];
@@ -674,6 +683,12 @@ app.get('/api/export/transactions', getUserFromToken, async (req, res) => {
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', 'attachment; filename="transactions.csv"');
   res.send(csvData);
+});
+
+app.use((err, req, res, next) => {
+  console.error(err);
+  if (res.headersSent) return next(err);
+  res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
 });
 
 app.get('*', (req, res) => {
