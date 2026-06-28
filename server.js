@@ -12,22 +12,33 @@ const PORT = process.env.PORT || 3000;
 
 const requiredEnv = ['SUPABASE_URL', 'SUPABASE_ANON_KEY'];
 const missingEnv = requiredEnv.filter(name => !process.env[name]);
-if (missingEnv.length > 0) {
-  console.error('[ERROR] Missing required environment variables:', missingEnv.join(', '));
-  process.exit(1);
-}
-
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// Initialize Supabase
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
-);
-const supabaseAdmin = serviceRoleKey ? createClient(process.env.SUPABASE_URL, serviceRoleKey) : null;
+let supabase = null;
+let supabaseAdmin = null;
 
-// Helper to prefer admin client for server-side writes when available
-const db = () => supabaseAdmin || supabase;
+function initializeSupabase() {
+  if (supabase) return;
+  if (missingEnv.length > 0) {
+    const message = `Missing required environment variables: ${missingEnv.join(', ')}`;
+    console.error('[ERROR]', message);
+    throw new Error(message);
+  }
+
+  supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+  if (serviceRoleKey) {
+    supabaseAdmin = createClient(process.env.SUPABASE_URL, serviceRoleKey);
+  }
+}
+
+function db() {
+  initializeSupabase();
+  return supabaseAdmin || supabase;
+}
+
+if (missingEnv.length > 0 && require.main === module) {
+  process.exit(1);
+}
 
 async function getActiveGroupId(userId) {
   const { data, error } = await db()
@@ -669,6 +680,10 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`Seth and Paula finances server listening on http://localhost:${PORT}`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Seth and Paula finances server listening on http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;
