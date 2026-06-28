@@ -9,6 +9,14 @@ const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+const requiredEnv = ['SUPABASE_URL', 'SUPABASE_ANON_KEY'];
+const missingEnv = requiredEnv.filter(name => !process.env[name]);
+if (missingEnv.length > 0) {
+  console.error('[ERROR] Missing required environment variables:', missingEnv.join(', '));
+  process.exit(1);
+}
+
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // Initialize Supabase
@@ -21,11 +29,105 @@ const supabaseAdmin = serviceRoleKey ? createClient(process.env.SUPABASE_URL, se
 // Helper to prefer admin client for server-side writes when available
 const db = () => supabaseAdmin || supabase;
 
-const requiredEnv = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY'];
-const missingEnv = requiredEnv.filter(name => !process.env[name]);
-if (missingEnv.length > 0) {
-  console.error('[ERROR] Missing required environment variables:', missingEnv.join(', '));
-  process.exit(1);
+async function getActiveGroupId(userId) {
+  const { data, error } = await db()
+    .from('settings')
+    .select('value')
+    .eq('user_id', userId)
+    .eq('key', 'active_group_id')
+    .maybeSingle();
+
+  if (error) return null;
+  if (data?.value) return data.value;
+
+  const membership = await db()
+    .from('group_memberships')
+    .select('group_id')
+    .eq('user_id', userId)
+    .limit(1)
+    .maybeSingle();
+
+  return membership?.group_id || null;
+}
+
+function addInterval(dateStr, frequency) {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return null;
+
+  switch (frequency) {
+    case 'daily':
+      d.setDate(d.getDate() + 1);
+      break;
+    case 'weekly':
+      d.setDate(d.getDate() + 7);
+      break;
+    case 'monthly':
+      d.setMonth(d.getMonth() + 1);
+      break;
+    case 'yearly':
+      d.setFullYear(d.getFullYear() + 1);
+      break;
+    default:
+      return null;
+  }
+
+  return d.toISOString().slice(0, 10);
+}
+
+async function processDueRecurring(userId) {
+  const today = new Date().toISOString().slice(0, 10);
+  const { data: recurringEntries, error } = await db()
+    .from('recurring_transactions')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('is_active', true);
+
+  if (error || !Array.isArray(recurringEntries)) return;
+  const activeGroupId = await getActiveGroupId(userId);
+
+  for (const entry of recurringEntries) {
+    const startDate = entry.start_date;
+    if (!startDate || startDate > today) continue;
+
+    let nextRun = entry.last_run_date || entry.start_date;
+    if (nextRun < entry.start_date) nextRun = entry.start_date;
+
+    const created = [];
+    while (nextRun && nextRun <= today) {
+      const existing = await db()
+        .from('transactions')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('date', nextRun)
+        .eq('type', entry.type)
+        .eq('category', entry.category)
+        .eq('amount', entry.amount)
+        .maybeSingle();
+
+      if (!existing?.id) {
+        created.push({
+          user_id: userId,
+          group_id: activeGroupId,
+          date: nextRun,
+          amount: entry.amount,
+          type: entry.type,
+          category: entry.category,
+          note: entry.note || ''
+        });
+      }
+
+      nextRun = addInterval(nextRun, entry.frequency);
+    }
+
+    if (created.length) {
+      await db().from('transactions').insert(created);
+      const lastRun = created[created.length - 1].date;
+      await db()
+        .from('recurring_transactions')
+        .update({ last_run_date: lastRun })
+        .eq('id', entry.id);
+    }
+  }
 }
 
 const isProduction = process.env.NODE_ENV === 'production';
@@ -125,12 +227,20 @@ app.get('/api/auth/me', getUserFromToken, async (req, res) => {
 // ===== TRANSACTIONS ENDPOINTS =====
 app.get('/api/transactions', getUserFromToken, async (req, res) => {
   const { startDate, endDate, category, type, search } = req.query;
-  
+  const activeGroupId = await getActiveGroupId(req.user.id);
+
+  await processDueRecurring(req.user.id);
+
   let query = db()
     .from('transactions')
     .select('*')
-    .eq('user_id', req.user.id)
     .order('date', { ascending: false });
+
+  if (activeGroupId) {
+    query = query.or(`user_id.eq.${req.user.id},group_id.eq.${activeGroupId}`);
+  } else {
+    query = query.eq('user_id', req.user.id);
+  }
 
   if (startDate) query = query.gte('date', startDate);
   if (endDate) query = query.lte('date', endDate);
@@ -159,9 +269,10 @@ app.post('/api/transactions', getUserFromToken, async (req, res) => {
     return res.status(400).json({ error: 'date, amount, and type are required' });
   }
 
+  const activeGroupId = await getActiveGroupId(req.user.id);
   const { data, error } = await db()
     .from('transactions')
-    .insert([{ date, amount, type, category, note, user_id: req.user.id }])
+    .insert([{ date, amount, type, category, note, user_id: req.user.id, group_id: activeGroupId }])
     .select();
   
   if (error) return res.status(400).json({ error: error.message });
@@ -203,11 +314,16 @@ app.delete('/api/transactions/:id', getUserFromToken, async (req, res) => {
 // ===== SUMMARY ENDPOINT =====
 app.get('/api/summary', getUserFromToken, async (req, res) => {
   try {
-      const { data: transactions, error: transactionsError } = await db()
-        .from('transactions')
-        .select('*')
-        .eq('user_id', req.user.id);
+    const activeGroupId = await getActiveGroupId(req.user.id);
+    let txQuery = db().from('transactions').select('*');
 
+    if (activeGroupId) {
+      txQuery = txQuery.or(`user_id.eq.${req.user.id},group_id.eq.${activeGroupId}`);
+    } else {
+      txQuery = txQuery.eq('user_id', req.user.id);
+    }
+
+    const { data: transactions, error: transactionsError } = await txQuery;
     if (transactionsError) return res.status(400).json({ error: transactionsError.message });
     const safeTransactions = Array.isArray(transactions) ? transactions : [];
 
@@ -276,6 +392,109 @@ app.post('/api/currency', getUserFromToken, async (req, res) => {
   res.json({ currency });
 });
 
+app.post('/api/import/transactions', getUserFromToken, async (req, res) => {
+  const records = req.body.records;
+  if (!Array.isArray(records) || !records.length) {
+    return res.status(400).json({ error: 'records are required' });
+  }
+
+  const activeGroupId = await getActiveGroupId(req.user.id);
+  const inserts = records.map(record => ({
+    user_id: req.user.id,
+    group_id: activeGroupId,
+    date: record.date,
+    amount: Number(record.amount),
+    type: record.type,
+    category: record.category,
+    note: record.note || ''
+  })).filter(row => row.date && !Number.isNaN(row.amount) && ['income','expense'].includes(row.type) && row.category);
+
+  if (!inserts.length) {
+    return res.status(400).json({ error: 'No valid records to import' });
+  }
+
+  const { data, error } = await db()
+    .from('transactions')
+    .insert(inserts)
+    .select();
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ imported: Array.isArray(data) ? data.length : 0 });
+});
+
+app.post('/api/group/create', getUserFromToken, async (req, res) => {
+  const { name } = req.body;
+  if (!name) return res.status(400).json({ error: 'Group name is required' });
+
+  const code = `G-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+  const { data: group, error: groupError } = await db()
+    .from('groups')
+    .insert([{ name, code }])
+    .select()
+    .single();
+
+  if (groupError) return res.status(400).json({ error: groupError.message });
+
+  const { error: membershipError } = await db()
+    .from('group_memberships')
+    .insert([{ user_id: req.user.id, group_id: group.id }]);
+
+  if (membershipError) return res.status(400).json({ error: membershipError.message });
+
+  await db()
+    .from('settings')
+    .upsert([{ user_id: req.user.id, key: 'active_group_id', value: group.id }], { onConflict: 'user_id,key' });
+
+  res.json({ group });
+});
+
+app.post('/api/group/join', getUserFromToken, async (req, res) => {
+  const { code } = req.body;
+  if (!code) return res.status(400).json({ error: 'Group invite code is required' });
+
+  const { data: group, error: groupError } = await db()
+    .from('groups')
+    .select('*')
+    .eq('code', code)
+    .maybeSingle();
+
+  if (groupError || !group) return res.status(400).json({ error: 'Group not found' });
+
+  const { error: membershipError } = await db()
+    .from('group_memberships')
+    .upsert([{ user_id: req.user.id, group_id: group.id }], { onConflict: 'user_id,group_id' });
+
+  if (membershipError) return res.status(400).json({ error: membershipError.message });
+
+  await db()
+    .from('settings')
+    .upsert([{ user_id: req.user.id, key: 'active_group_id', value: group.id }], { onConflict: 'user_id,key' });
+
+  res.json({ group });
+});
+
+app.get('/api/group', getUserFromToken, async (req, res) => {
+  const activeGroupId = await getActiveGroupId(req.user.id);
+  if (!activeGroupId) return res.json({ group: null, members: [] });
+
+  const { data: group, error: groupError } = await db()
+    .from('groups')
+    .select('*')
+    .eq('id', activeGroupId)
+    .maybeSingle();
+
+  if (groupError || !group) return res.status(400).json({ error: 'Group not found' });
+
+  const { data: members, error: membersError } = await db()
+    .from('group_memberships')
+    .select('user_id')
+    .eq('group_id', activeGroupId);
+
+  if (membersError) return res.status(400).json({ error: membersError.message });
+
+  res.json({ group, members: Array.isArray(members) ? members.map(m => m.user_id) : [] });
+});
+
 app.get('/api/rates', async (req, res) => {
   try {
     const response = await fetch('https://api.exchangerate.host/latest?base=USD&symbols=USD,AED,UGX');
@@ -292,12 +511,18 @@ app.get('/api/rates', async (req, res) => {
 // ===== ANALYTICS ENDPOINTS =====
 app.get('/api/analytics/categories', getUserFromToken, async (req, res) => {
   const { startDate, endDate } = req.query;
+  const activeGroupId = await getActiveGroupId(req.user.id);
 
   let query = db()
     .from('transactions')
     .select('*')
-    .eq('user_id', req.user.id)
     .eq('type', 'expense');
+
+  if (activeGroupId) {
+    query = query.or(`user_id.eq.${req.user.id},group_id.eq.${activeGroupId}`);
+  } else {
+    query = query.eq('user_id', req.user.id);
+  }
 
   if (startDate) query = query.gte('date', startDate);
   if (endDate) query = query.lte('date', endDate);
@@ -320,11 +545,16 @@ app.get('/api/analytics/categories', getUserFromToken, async (req, res) => {
 });
 
 app.get('/api/analytics/monthly', getUserFromToken, async (req, res) => {
-  const { data, error } = await db()
-    .from('transactions')
-    .select('*')
-    .eq('user_id', req.user.id);
+  const activeGroupId = await getActiveGroupId(req.user.id);
+  let query = db().from('transactions').select('*');
 
+  if (activeGroupId) {
+    query = query.or(`user_id.eq.${req.user.id},group_id.eq.${activeGroupId}`);
+  } else {
+    query = query.eq('user_id', req.user.id);
+  }
+
+  const { data, error } = await query;
   if (error) return res.status(400).json({ error: error.message });
 
   const monthly = {};

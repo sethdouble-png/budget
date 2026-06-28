@@ -291,20 +291,19 @@ select {
 
 button {
   padding: 14px 18px;
-  background: #2563eb;
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
   color: #fff;
   border: none;
   border-radius: 18px;
   font-size: 15px;
   cursor: pointer;
   box-shadow: 0 14px 28px rgba(37, 99, 235, 0.18);
+  transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
 
 button:hover {
-  background: rgba(255, 255, 255, 0.72);
-  color: #0f172a;
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  backdrop-filter: blur(10px);
+  transform: translateY(-1px);
+  background: linear-gradient(135deg, #1d4ed8, #2563eb);
 }
 
 .delete-btn {
@@ -327,23 +326,106 @@ button:hover {
 
 /* Quick Add */
 .quick-add {
-  background: #fff;
-  padding: 22px;
-  border-radius: 28px;
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  box-shadow: 0 18px 35px rgba(15, 23, 42, 0.06);
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+  padding: 24px;
+  border-radius: 32px;
+  border: 1px solid rgba(37, 99, 235, 0.12);
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08);
   margin-bottom: 24px;
 }
 
 .quick-add h2 {
   margin-top: 0;
-  margin-bottom: 16px;
-  font-size: 1.15rem;
+  margin-bottom: 18px;
+  font-size: 1.2rem;
 }
 
 .quick-add form {
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 14px;
+}
+
+.advice-section {
+  background: #eff6ff;
+  padding: 24px;
+  border-radius: 32px;
+  border: 1px solid rgba(59, 130, 246, 0.16);
+  box-shadow: 0 20px 40px rgba(56, 189, 248, 0.08);
+  margin-bottom: 24px;
+}
+
+.advice-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.advice-header h2 {
+  margin: 0 0 8px;
+  font-size: 1.4rem;
+}
+
+.advice-header p {
+  margin: 0;
+  color: #334155;
+  max-width: 760px;
+}
+
+.advice-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.advice-card {
+  background: #fff;
+  padding: 20px;
+  border-radius: 28px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.06);
+}
+
+.advice-card h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 1.05rem;
+}
+
+.advice-card p {
+  margin: 0;
+  line-height: 1.7;
+  color: #475569;
+}
+
+.advice-card.accent-blue { border-color: rgba(37, 99, 235, 0.2); }
+.advice-card.accent-green { border-color: rgba(34, 197, 94, 0.2); }
+.advice-card.accent-indigo { border-color: rgba(79, 70, 229, 0.2); }
+
+.principles {
+  background: rgba(255, 255, 255, 0.95);
+  padding: 22px;
+  border-radius: 28px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.principles h3 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-size: 1.2rem;
+}
+
+.principles ol {
+  margin: 0;
+  padding-left: 20px;
+  color: #334155;
+}
+
+.principles li {
+  margin-bottom: 12px;
+  line-height: 1.7;
 }
 
 /* Controls */
@@ -685,9 +767,59 @@ table tr:hover {
   font-weight: bold;
 }
 
-.setting-group input {
+.setting-group input,
+.setting-group button {
   width: 100%;
   max-width: 300px;
+  padding: 12px 14px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 16px;
+  font-size: 14px;
+  background: #fff;
+}
+
+.setting-group button {
+  cursor: pointer;
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.18);
+}
+
+.budget-alert {
+  padding: 14px 18px;
+  border-radius: 18px;
+  margin-top: 14px;
+  font-weight: bold;
+}
+
+.budget-alert.safe {
+  background: #ecfdf5;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.budget-alert.warning {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.budget-alert.danger {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.group-status,
+.group-list {
+  margin-top: 10px;
+  color: #334155;
+}
+
+.import-group {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
 }
 
 /* Responsive */

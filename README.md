@@ -29,7 +29,7 @@ Production setup
 Environment variables
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (optional; required only for admin user creation and server-side privileged operations)
 - `CORS_ORIGIN` (optional, comma-separated allowed origins)
 - `NODE_ENV=production` for production deployments
 

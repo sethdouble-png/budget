@@ -17,6 +17,54 @@ const currencySymbols = {
   'UGX': 'USh'
 };
 
+const financeAdvice = [
+  {
+    title: 'Save before you spend',
+    text: 'Automate savings first, then plan spending from what remains. This creates a simple, stable financial cushion.'
+  },
+  {
+    title: 'Build multiple income streams',
+    text: 'Relying on one source of income is risky. Side income, investments, and freelance work help you stay resilient.'
+  },
+  {
+    title: 'Invest in time, not timing',
+    text: 'Focus on long-term compound growth rather than trying to pick the perfect entry point in markets.'
+  },
+  {
+    title: 'Track your cash flow',
+    text: 'Know exactly where money enters and leaves your accounts. Clarity makes it easier to cut waste and increase savings.'
+  },
+  {
+    title: 'Make your money work harder',
+    text: 'Convert excess cash into assets like stocks, property, or skills that increase earning power.'
+  },
+  {
+    title: 'Protect your downside',
+    text: 'Emergencies happen. Keep reserves and insurance in place so one setback does not derail your progress.'
+  },
+  {
+    title: 'Learn continuously',
+    text: 'The best financial advantage is knowledge. Read, study successful founders, and apply lessons quickly.'
+  },
+  {
+    title: 'Keep spending intentional',
+    text: 'Every expense should serve a purpose. Avoid impulse purchases and align spending with your goals.'
+  }
+];
+
+const financePrinciples = [
+  'Spend less than you earn and invest the surplus into assets.',
+  'Diversify income streams so you are not dependent on one source.',
+  'Use debt strategically: good debt for growth, avoid high-cost consumer debt.',
+  'Build a financial cushion before taking bigger risks.',
+  'Invest consistently and let compounding work over time.',
+  'Develop valuable skills that increase your earning power.',
+  'Measure progress regularly and adjust quickly when needed.',
+  'Create systems that scale in business and personal finance.',
+  'Keep a long-term vision while optimizing daily habits.',
+  'Learn from mentors, books, and proven entrepreneurs.'
+];
+
 const DEFAULT_BASE_CURRENCY = 'USD';
 let exchangeRates = {
   USD: 1,
@@ -129,6 +177,8 @@ function showAppPages() {
   document.getElementById('appContainer').style.display = 'block';
   document.getElementById('userEmail').textContent = currentUser?.email || '';
   document.getElementById('currencySelect').value = currentCurrency;
+  loadGroup();
+  initializeAdviceSection();
 }
 
 // ===== AUTH LISTENERS =====
@@ -166,6 +216,33 @@ async function handleLogin(e) {
   } catch (e) {
     document.getElementById('loginError').textContent = e.message;
   }
+}
+
+function initializeAdviceSection() {
+  const adviceCards = document.getElementById('adviceCards');
+  const principlesList = document.getElementById('principlesList');
+
+  if (!adviceCards || !principlesList) return;
+
+  adviceCards.innerHTML = '';
+  const cardClasses = ['accent-blue', 'accent-green', 'accent-indigo'];
+
+  financeAdvice.forEach((advice, index) => {
+    const card = document.createElement('article');
+    card.className = `advice-card ${cardClasses[index % cardClasses.length]}`;
+    card.innerHTML = `
+      <h3>${advice.title}</h3>
+      <p>${advice.text}</p>
+    `;
+    adviceCards.appendChild(card);
+  });
+
+  principlesList.innerHTML = '';
+  financePrinciples.forEach(principle => {
+    const li = document.createElement('li');
+    li.textContent = principle;
+    principlesList.appendChild(li);
+  });
 }
 
 async function handleSignup(e) {
@@ -352,6 +429,125 @@ function displayTransactions(txs) {
   });
 }
 
+async function loadGroup() {
+  try {
+    const data = await fetchJSON(`${API_BASE}/group`, {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+
+    const statusEl = document.getElementById('groupStatus');
+    const listEl = document.getElementById('groupList');
+    listEl.innerHTML = '';
+
+    if (!data.group) {
+      statusEl.textContent = 'Not currently in a shared group.';
+      return;
+    }
+
+    statusEl.textContent = `In group: ${data.group.name} (${data.group.code})`;
+    if (Array.isArray(data.members) && data.members.length) {
+      const membersText = data.members.map(m => m).join(', ');
+      listEl.textContent = `Members: ${membersText}`;
+    }
+  } catch (e) {
+    console.warn('Could not load group data', e);
+  }
+}
+
+async function createGroup() {
+  const name = document.getElementById('groupName').value.trim();
+  if (!name) return alert('Group name is required.');
+
+  try {
+    const res = await fetch(`${API_BASE}/group/create`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify({ name })
+    });
+
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || 'Failed to create group');
+    document.getElementById('groupName').value = '';
+    await loadGroup();
+    await refreshTransactions();
+  } catch (e) {
+    alert('Error creating group: ' + e.message);
+  }
+}
+
+async function joinGroup() {
+  const code = document.getElementById('groupCode').value.trim();
+  if (!code) return alert('Group invite code is required.');
+
+  try {
+    const res = await fetch(`${API_BASE}/group/join`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify({ code })
+    });
+
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || 'Failed to join group');
+    document.getElementById('groupCode').value = '';
+    await loadGroup();
+    await refreshTransactions();
+  } catch (e) {
+    alert('Error joining group: ' + e.message);
+  }
+}
+
+function parseCSV(contents) {
+  const lines = contents.trim().split(/\r?\n/);
+  const headers = lines.shift().split(',').map(h => h.trim().toLowerCase());
+  return lines.map(line => {
+    const values = line.split(',').map(v => v.trim());
+    const record = {};
+    headers.forEach((header, index) => {
+      record[header] = values[index] || '';
+    });
+    return record;
+  });
+}
+
+async function importTransactions() {
+  const fileInput = document.getElementById('importFile');
+  if (!fileInput.files.length) return alert('Please choose a CSV file to import.');
+
+  const file = fileInput.files[0];
+  const reader = new FileReader();
+  reader.onload = async (event) => {
+    const contents = event.target.result;
+    const records = parseCSV(contents);
+
+    try {
+      const res = await fetch(`${API_BASE}/import/transactions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({ records })
+      });
+
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Import failed');
+      alert(`Imported ${result.imported} transactions successfully.`);
+      fileInput.value = '';
+      await refreshTransactions();
+      await loadSummary();
+    } catch (e) {
+      alert('Error importing CSV: ' + e.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
 function openEditModal(id, date, amount, type, category, note) {
   document.getElementById('editId').value = id;
   document.getElementById('editDate').value = date;
@@ -504,6 +700,31 @@ function updateBudgetVisualization(spent, budget) {
     const percent = (spent / budget) * 100;
     document.getElementById('budgetFill').style.width = Math.min(percent, 100) + '%';
     document.getElementById('budgetPercent').textContent = percent.toFixed(0) + '%';
+    updateBudgetAlert(spent, budget, percent);
+  } else {
+    updateBudgetAlert(spent, budget, 0);
+  }
+}
+
+function updateBudgetAlert(spent, budget, percent) {
+  const alertEl = document.getElementById('budgetAlert');
+  if (!alertEl) return;
+
+  if (!budget || budget <= 0) {
+    alertEl.textContent = 'Set a monthly budget to track progress and alerts.';
+    alertEl.className = 'budget-alert safe';
+    return;
+  }
+
+  if (percent >= 100) {
+    alertEl.textContent = 'You have reached or exceeded your budget! Review your spending.';
+    alertEl.className = 'budget-alert danger';
+  } else if (percent >= 80) {
+    alertEl.textContent = 'You are nearing your budget limit. Keep an eye on spending.';
+    alertEl.className = 'budget-alert warning';
+  } else {
+    alertEl.textContent = 'Good job — spending is within your budget.';
+    alertEl.className = 'budget-alert safe';
   }
 }
 
@@ -579,15 +800,15 @@ function displayCategories(categories) {
   currentCategories = Array.isArray(categories) ? categories : [];
   const tbody = document.querySelector('#categoriesTable tbody');
   tbody.innerHTML = '';
-  const symbol = currencySymbols[currentCurrency];
   
   currentCategories.forEach(cat => {
     const total = Number(cat.total || 0);
+    const convertedTotal = convertAmount(total);
     const percentage = Number(cat.percentage || 0);
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${cat.category}</td>
-      <td>${symbol}${total.toFixed(2)}</td>
+      <td>${formatMoney(total)}</td>
       <td>${percentage}%</td>
       <td><div class="bar" style="width:${percentage}%"></div></td>
     `;
@@ -599,7 +820,6 @@ function displayMonthly(monthly) {
   currentMonthly = Array.isArray(monthly) ? monthly : [];
   const tbody = document.querySelector('#monthlyTable tbody');
   tbody.innerHTML = '';
-  const symbol = currencySymbols[currentCurrency];
   
   currentMonthly.forEach(m => {
     const income = Number(m.income || 0);
@@ -608,9 +828,9 @@ function displayMonthly(monthly) {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${m.month}</td>
-      <td>${symbol}${income.toFixed(2)}</td>
-      <td>${symbol}${expense.toFixed(2)}</td>
-      <td>${symbol}${savings.toFixed(2)}</td>
+      <td>${formatMoney(income)}</td>
+      <td>${formatMoney(expense)}</td>
+      <td>${formatMoney(savings)}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -663,14 +883,14 @@ function displayRecurring(recurring) {
   currentRecurring = Array.isArray(recurring) ? recurring : [];
   const tbody = document.querySelector('#recurringTable tbody');
   tbody.innerHTML = '';
-  const symbol = currencySymbols[currentCurrency];
   const safeRecurring = currentRecurring;
   
   safeRecurring.forEach(r => {
     const amount = Number(r.amount || 0);
+    const displayAmount = formatMoney(amount);
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${symbol}${amount.toFixed(2)}</td>
+      <td>${displayAmount}</td>
       <td>${r.type}</td>
       <td>${r.category}</td>
       <td>${r.frequency}</td>

@@ -101,6 +101,46 @@
           <button type="submit">Add</button>
         </form>
       </section>
+
+      <section class="advice-section">
+        <div class="advice-header">
+          <div>
+            <h2>Smart Money Advice</h2>
+            <p>Practical guidance for budgeting, building wealth, and growing a stronger financial future.</p>
+          </div>
+        </div>
+
+        <div class="advice-cards" id="adviceCards">
+          <article class="advice-card accent-blue">
+            <h3>Save before you spend</h3>
+            <p>Automate savings first, then structure expenses around what remains. This habit builds resilience and prevents lifestyle inflation.</p>
+          </article>
+          <article class="advice-card accent-green">
+            <h3>Invest in growth</h3>
+            <p>Use low-cost index funds, retirement accounts, or business opportunities with a long-term edge rather than chasing quick wins.</p>
+          </article>
+          <article class="advice-card accent-indigo">
+            <h3>Know your cash flow</h3>
+            <p>Track income, recurring bills, and discretionary spending regularly. Clear visibility helps you protect your budget and spot opportunities.</p>
+          </article>
+        </div>
+
+        <div class="principles">
+          <h3>10 Principles of Wealth & Entrepreneurship</h3>
+          <ol id="principlesList">
+            <li>Spend less than you earn and direct the rest into assets.</li>
+            <li>Diversify income streams so you are not dependent on one source.</li>
+            <li>Protect your downside with emergency savings and insurance.</li>
+            <li>Commit to consistent investing over decades, not timing the market.</li>
+            <li>Build skills that compound over time, especially in communication and sales.</li>
+            <li>Use debt selectively; prefer productive debt for growth over consumer debt.</li>
+            <li>Keep learning from mentors, books, and real experience.</li>
+            <li>Create systems that scale, whether in business, investing, or budgeting.</li>
+            <li>Keep a long-term vision while optimizing daily habits.</li>
+            <li>Measure progress, adjust quickly, and never stop improving your money mindset.</li>
+          </ol>
+        </div>
+      </section>
     </div>
 
     <!-- Transactions Tab -->
@@ -261,9 +301,45 @@
       </section>
 
       <section class="settings-section">
+        <h2>Budget Settings</h2>
+        <div class="setting-group">
+          <label>Monthly Budget (<span id="budgetCurrency">$</span>)</label>
+          <input id="budgetInput" type="number" step="0.01" min="0">
+          <button type="button" onclick="saveBudget()">Save Budget</button>
+        </div>
+        <div id="budgetAlert" class="budget-alert"></div>
+      </section>
+
+      <section class="settings-section">
+        <h2>Shared Group</h2>
+        <div class="setting-group">
+          <input id="groupName" type="text" placeholder="Group name">
+          <button type="button" onclick="createGroup()">Create Shared Group</button>
+        </div>
+        <div class="setting-group">
+          <input id="groupCode" type="text" placeholder="Invite code">
+          <button type="button" onclick="joinGroup()">Join Shared Group</button>
+        </div>
+        <div id="groupStatus" class="group-status">Not currently in a shared group.</div>
+        <div id="groupList" class="group-list"></div>
+      </section>
+
+      <section class="settings-section">
+        <h2>Import / Export</h2>
+        <div class="setting-group import-group">
+          <button type="button" onclick="exportTransactions()">Export Transactions</button>
+          <input id="importFile" type="file" accept=".csv">
+          <button type="button" onclick="importTransactions()">Import CSV</button>
+        </div>
+      </section>
+
+      <section class="settings-section">
         <h2>Account</h2>
         <div class="setting-group">
           <p id="userEmail"></p>
+        </div>
+        <div class="setting-group">
+          <button type="button" onclick="logout()">Logout</button>
         </div>
       </section>
     </div>
